@@ -329,13 +329,13 @@ jupyter notebook storm/quick_run_example.ipynb
 If you use STORM, please cite:
 
 ```bibtex
-@article{satouf2026storm,
-  title   = {STORM: Stepwise Token Optimization with Reward-Guided Beam Search},
-  author  = {Satouf, Arthur and D'Erasmo, Giulio and Zong, Yuxuan and
-             Amadou Boubacar, Habiboulaye and Piantanida, Pablo and
-             Piwowarski, Benjamin},
-  journal = {arXiv preprint arXiv:2606.10621},
-  year    = {2026},
-  doi     = {10.48550/arXiv.2606.10621}
+@misc{satouf2026stormstepwisetokenoptimization,
+      title={STORM: Stepwise Token Optimization with Reward-Guided Beam Search}, 
+      author={Arthur Satouf and Giulio D'Erasmo and Yuxuan Zong and Habiboulaye Amadou Boubacar and Pablo Piantanida and Benjamin Piwowarski},
+      year={2026},
+      eprint={2606.10621},
+      archivePrefix={arXiv},
+      primaryClass={cs.IR},
+      url={https://arxiv.org/abs/2606.10621}, 
 }
 ```
