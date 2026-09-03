@@ -1,0 +1,110 @@
+# ============================================================================
+# BRIGHT: pyserini prebuilt topics/qrels/indexes, query-side generation only
+# ============================================================================
+experiment:
+  name: storm model name 
+
+data:
+  datasets:
+    - bright-biology
+    - bright-earth-science
+    - bright-economics
+    - bright-psychology
+    - bright-robotics
+    - bright-stackoverflow
+    - bright-sustainable-living
+    - bright-pony
+    - bright-leetcode
+    - bright-aops
+    - bright-theoremqa-theorems
+    - bright-theoremqa-questions
+  split: test
+  skip_corpus_runs_when_unavailable: true
+
+stages:
+  generate_queries: auto
+  generate_corpus: skip
+  build_indexes: skip
+  evaluate: true
+
+reuse:
+  allow_legacy_artifacts_without_manifest: true
+  allow_legacy_indexes_without_manifest: false
+
+paths:
+-
+
+  # Leave unset to use the pyserini prebuilt index named after the dataset.
+  # bright_index_template: "/path/to/local/indexes/{dataset}"
+
+  output_root: generated_storm data
+  global_summary: "{output_root}/eval/bright_summary.csv"
+
+model:
+  device: cuda
+  device_map: auto
+  dtype: float32
+  attn_implementation: sdpa
+  base_model: Qwen3-8B
+  adapter_path: path to storm model 
+
+prompt:
+  system: |-
+    From the query generate new semantically related keywords.
+    Output the result strictly as a single comma-separated line.
+  user_prefix: "[QUERY]: "
+  user_suffix: "\n[KEYWORDS]: "
+  language_by_dataset: {}
+
+generation:
+  query_batch_size: 32
+  corpus_batch_size: 32
+  query_max_input_tokens: 2048   # BRIGHT queries are long
+  corpus_max_input_tokens: null
+  checkpoint_every_batches: 20
+  resume: true
+  community_tools_path: storm/eval/community_tools
+
+  query_decoding:
+    max_new_tokens: 64
+    num_beams: 6
+    num_beam_groups: 3
+    diversity_penalty: 1.0
+    num_return_sequences: 3
+    repetition_penalty: 1.0
+    do_sample: false
+  corpus_decoding:
+    max_new_tokens: 64
+    num_beams: 1
+    num_beam_groups: 1
+    num_return_sequences: 1
+    do_sample: false
+
+indexing:
+  threads: 1
+  targets: []
+
+evaluation:
+  retrieval_type: bm25
+  ndcg_k: 10
+  mrr_k: 10
+  recall_ks: [100, 1000]
+  filter_self_docid: true       # automatically disabled for BRIGHT
+  search_threads: 30
+
+  significance:
+    enabled: true
+    baseline_run: initial_on_original
+    alpha: 0.05
+    correction: holm
+
+  runs:
+    - name: initial_on_original
+      query: initial
+      index: original
+    - name: generated_on_original
+      query: generated
+      index: original
+    - name: initial_plus_generated_on_original
+      query: initial_plus_generated
+      index: original

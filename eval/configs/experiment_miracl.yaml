@@ -1,0 +1,117 @@
+# ============================================================================
+# MIRACL: query-side generation only (no local corpus)
+# ============================================================================
+experiment:
+  name: storm model name 
+
+data:
+  # Either bare language codes with `miracl: true`, or explicit "miracl-xx"
+  # names (which are detected without the flag).
+ # datasets: [] 
+  datasets: [ar, bn, fa, fi, hi, id ,ja, ko,  sw, te, th, zh, de, yo, ru, es, fr,en]
+  split: dev
+  miracl: true
+  skip_corpus_runs_when_unavailable: false
+
+stages:
+  generate_queries: auto
+  generate_corpus: auto        # no corpus available for MIRACL
+  build_indexes: auto
+  evaluate: true
+
+reuse:
+  allow_legacy_artifacts_without_manifest: true
+  allow_legacy_indexes_without_manifest: false
+
+paths:
+ 
+  # MIRACL topics / qrels / indexes.
+  # If the JSON files are missing, pyserini's packaged topics+qrels and the
+  # prebuilt index miracl-v1.0-{lang} are used instead.
+  miracl_root: miracl data root
+  miracl_topics_template: "{miracl_root}/topics/{lang}/dev_queries.json"
+  miracl_qrels_template: "{miracl_root}/topics/{lang}/dev_qrels.json"
+  miracl_index_template: "{miracl_root}/indexes/lucene-index.miracl-v1.0-{lang}"
+  miracl_corpus_template: "{miracl_root}/corpus/{lang}"
+
+  # Optional: downloaded passage collection (miracl/miracl-corpus).
+  # Point at either a directory of raw docs-*.jsonl.gz shards or a single
+  # corpus.jsonl. Leave unset for query-side expansion only, which is what the
+  # runs below need. Only set it if you also want document-side expansion, and
+  # expect that to be feasible only for the small languages.
+  # miracl_corpus_template: "{miracl_root}/corpus/{lang}"
+
+  output_root: output generated data
+  global_summary: "{output_root}/eval/miracl_summary.csv"
+
+model:
+  device: cuda
+  device_map: auto
+  dtype: float32
+  attn_implementation: sdpa
+  base_model: Qwen3-8B
+  adapter_path: storm model
+
+prompt:
+  system: |-
+    From the query generate new semantic related keywords.
+    Output the result strictly as a single comma-separated line.
+  user_prefix: "[QUERY]: "
+  user_suffix: "\n[KEYWORDS]: "
+  # Appends " The keywords must be in <Language>." per MIRACL language.
+  auto_language_for_miracl: true
+  language_instruction: " The keywords must be in {language}."
+  language_by_dataset: {}
+
+generation:
+  query_batch_size: 32
+  corpus_batch_size: 16
+  query_max_input_tokens: null
+  corpus_max_input_tokens: 3000
+  checkpoint_every_batches: 100
+  resume: true
+  community_tools_path: storm/eval/community_tools
+
+  query_decoding:
+    max_new_tokens: 64
+    num_beams: 6
+    num_beam_groups: 3
+    diversity_penalty: 1.0
+    num_return_sequences: 3
+    repetition_penalty: 1.0
+    do_sample: false
+  corpus_decoding:
+    max_new_tokens: 64
+    num_beams: 1
+    num_beam_groups: 1
+    num_return_sequences: 1
+    do_sample: false
+
+indexing:
+  threads: 1
+  targets: [keywords, keywords_plus_original]
+
+evaluation:
+  retrieval_type: bm25
+  ndcg_k: 10
+  mrr_k: 10
+  recall_ks: [100, 1000]
+  filter_self_docid: true       # automatically disabled for MIRACL/BRIGHT
+  search_threads: 30
+
+  significance:
+    enabled: true
+    baseline_run: initial_on_original
+    alpha: 0.05
+    correction: holm
+
+  runs:
+    - name: initial_on_original
+      query: initial
+      index: original
+    - name: generated_on_original
+      query: generated
+      index: original
+    - name: initial_plus_generated_on_original
+      query: initial_plus_generated
+      index: original

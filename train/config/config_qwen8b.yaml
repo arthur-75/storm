@@ -1,0 +1,98 @@
+seed: 42
+device: cuda
+exp_name: q8_eps0.1_sbeam_full_best_nosplade_freqnorm_exp
+model_parallel: true
+yaml_file: beams/training/
+
+reward:
+  retrieval_type: bm25
+  #you dont need it was experimental
+  #index_path: beams/data/splade_index 
+  #splade_query_encoder: beams/models/splade-cocondenser-ensembledistil
+  #spalde_query_path:beams/data/spalde_queries_15.pkl
+  splade_device: cuda:0
+  bm25_k: 100
+  topk_per_beam: 5
+  show_more: false
+  ndcg: hard
+  best_beam_sel: true
+  lambda_ndcg: 1
+  lambda_term_freq: 0.005
+  lambda_llk: 0.01
+  apply_benchmark: false
+  use_freq: true
+  splade_batch_size: 32
+  ret_both: false
+  lambda_sp: 0.05
+
+data:
+  pkl_path: beams/data/
+  max_queries: null
+  generation_jsonl: beams/training/{exp_name}/log/iter_{iter}/batch_{batch:06d}.jsonl
+  #you dont need it was to diagnostique 
+  #dl_data_root: beams/data/text_data/text_data
+
+prompt:
+  system_prompt: From the query generate new semantic related keywords.\nOutput the
+    result strictly as a single comma-separated line.
+  user_prefix: '[QUERY]: '
+  user_suffix: '\n[KEYWORDS]: '
+  
+generation:
+  batch_size: 16
+  max_new_tokens: 32
+  num_beams: 5
+  repetition_penalty: 1
+  do_sample: true
+  epsilon_qi: 0.2
+  temperature: 1
+  top_p: 0.9
+  top_k: 500
+
+training:
+  gradient_accumulation_steps: 16
+  learning_rate: 1.0e-06
+  num_train_epochs: 1
+  max_seq_length: 32
+  logging_steps: 20
+  save_steps: 10
+  save_total_limit: 50
+  fp16: false
+  last_ckpt: beams/training/{exp_name}/ckpt/
+  output_dir: beams/training/{exp_name}/ckpt/{exp_name}_iter_{iter}_batch_{batch:06d}/
+  msmarco_v: ""
+  token_loss: true
+
+logging:
+  debug_log_path: beams/training/{exp_name}/log/{exp_name}_debug_scores.log
+
+eval:
+  enabled: true
+  num_queries: 500
+  batch_size: 64
+  max_new_tokens: 32
+  repetition_penalty: 1
+  log_path: beams/training/{exp_name}/eval/{exp_name}_eval_evolution.log
+  dump_jsonl: beams/training/{exp_name}/eval/eval_dumps/iter{iter}_batch{batch}_{exp_name}.jsonl
+
+pipeline:
+  base_model_name_or_path: beams/models/Qwen3-8B 
+  num_iterations: 1
+  run_generation: true
+  run_training: true
+
+lora:
+  enabled: false
+  r: 128
+  alpha: 128
+  dropout: 0.1
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+

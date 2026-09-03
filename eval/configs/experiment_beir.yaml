@@ -1,0 +1,180 @@
+# ============================================================================
+# Experiment  (BEIR / MS MARCO — same semantics as your current YAML)
+# ============================================================================
+experiment:
+  name: storm model name 
+
+data:
+  datasets:
+    - nfcorpus
+    - scifacr
+    # - trec-dl-hard
+  split: test
+
+  # Optional (all empty by default, so behaviour is unchanged):
+  #   dataset_kinds:   force a family for a dataset name -> beir | miracl | bright
+  #   split_by_dataset: per-dataset split override, e.g. {msmarco: dev}
+  #   miracl: true      treat bare language codes (fr, ru, ...) as MIRACL
+  dataset_kinds: {}
+  split_by_dataset: {}
+  miracl: false
+  skip_corpus_runs_when_unavailable: true
+
+# ============================================================================
+# Stage control
+#
+# auto  = reuse after validation, otherwise generate/build
+# force = regenerate/rebuild
+# skip  = never generate/build; only reuse an already valid artifact
+# ============================================================================
+stages:
+  generate_queries: auto
+  generate_corpus: auto
+  build_indexes: auto
+  evaluate: true
+
+reuse:
+  allow_legacy_artifacts_without_manifest: true
+  allow_legacy_indexes_without_manifest: false
+
+# ============================================================================
+# Paths
+# ============================================================================
+paths:
+  data_root:   beir text_data
+  original_index_root: bier index_data
+  original_index_template: "{index_root}/{dataset}"
+
+  output_root: generated_storm data
+  global_summary: "{output_root}/eval/{dataset}_summary.csv"
+
+  # Optional: evaluate a query set against another dataset's index.
+  # index_dataset_aliases:
+  #   trec-dl-2019: msmarco
+  #   trec-dl-2020: msmarco
+  #   trec-dl-hard: msmarco
+
+# ============================================================================
+# Model
+# ============================================================================
+model:
+  device: cuda
+  device_map: auto
+  dtype: float32
+  attn_implementation: sdpa
+  base_model: Qwen3-8B
+  adapter_path: path storm model 
+
+# ============================================================================
+# Prompt
+# ============================================================================
+prompt:
+  system: |-
+    From the query generate new semantically related keywords.
+    Output the result strictly as a single comma-separated line.
+  user_prefix: "[QUERY]: "
+  user_suffix: "\n[KEYWORDS]: "
+
+  language_by_dataset: {}
+  auto_language_for_miracl: true
+  language_instruction: " The keywords must be in {language}."
+
+# ============================================================================
+# Generation
+# ============================================================================
+generation:
+  query_batch_size: 64
+  corpus_batch_size: 32
+  query_max_input_tokens: null
+  corpus_max_input_tokens: null
+  checkpoint_every_batches: 200
+  resume: true
+
+  community_tools_path: storm/eval/community_tools
+
+  corpus_decoding:
+    max_new_tokens: 64
+    num_beams: 1
+    num_beam_groups: 1
+    diversity_penalty: 1.0
+    num_return_sequences: 1
+    repetition_penalty: 1.0
+    do_sample: false
+    temperature: 1.0
+    top_k: 500
+    top_p: 0.9
+
+  query_decoding:
+    max_new_tokens: 64
+    num_beams: 6
+    num_beam_groups: 3
+    diversity_penalty: 1.0
+    num_return_sequences: 3
+    repetition_penalty: 1.0
+    do_sample: false
+    temperature: 1.0
+    top_k: 500
+    top_p: 0.9
+
+# ============================================================================
+# Generated corpus indexes
+# ============================================================================
+indexing:
+  threads: 1
+  targets:
+    - keywords
+    - keywords_plus_original
+
+# ============================================================================
+# Evaluation
+# ============================================================================
+evaluation:
+  retrieval_type: bm25          # bm25 | splade
+  ndcg_k: 10
+  mrr_k: 10
+  recall_ks: [100, 1000]
+  filter_self_docid: true
+  search_threads: 30
+  search_one_by_one: false      # true = per-query latency measurement
+
+  significance:
+    enabled: true
+    baseline_run: initial_on_original
+    alpha: 0.05
+    correction: holm            # holm | none
+
+  runs:
+    # Baselines
+    - name: initial_on_original
+      query: initial
+      index: original
+
+    # Generated query only
+    - name: generated_on_original
+      query: generated
+      index: original
+    - name: generated_on_keywords
+      query: generated
+      index: keywords
+    - name: generated_on_keywords_plus_original
+      query: generated
+      index: keywords_plus_original
+
+    # Initial query only on generated document representations
+    - name: initial_on_keywords
+      query: initial
+      index: keywords
+    - name: initial_on_keywords_plus_original
+      query: initial
+      index: keywords_plus_original
+
+    # Generated query concatenated with the initial query
+    - name: initial_plus_generated_on_original
+      query: initial_plus_generated
+      index: original
+    - name: initial_plus_generated_on_keywords
+      query: initial_plus_generated
+      index: keywords
+    - name: initial_plus_generated_on_keywords_plus_original
+      query: initial_plus_generated
+      index: keywords_plus_original
