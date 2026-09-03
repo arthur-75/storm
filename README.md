@@ -244,6 +244,14 @@ python storm/eval/run_retrieval_pipeline.py \
 
 Edit `storm/eval/configs/experiment_miracl.yaml`. Set `paths.miracl_root` to the local MIRACL topics, qrels, and Lucene indexes, then update the model and output paths described above.
 
+#### Language-specific BM25 analyzer
+
+**The BM25 analyzer must match the language of each MIRACL collection.** Tokenization, stemming, and stop-word handling differ by language, so using the default English analyzer for every collection produces incorrect retrieval scores.
+
+Keep `data.miracl: true` and identify datasets with their MIRACL language codes (for example, `ar`, `de`, `fr`, or `zh`). The evaluation pipeline propagates that code to Pyserini and calls `LuceneSearcher.set_language(...)` when opening each index. When building a local MIRACL index, use the same language code for indexing as for retrieval; the pipeline passes it to Pyserini's indexer through `--language`.
+
+In short, the query language, index analyzer, and dataset code must agree. This applies both to locally built indexes and Pyserini's language-specific prebuilt indexes such as `miracl-v1.0-{lang}`.
+
 Activate the environment and run MIRACL evaluation from the directory containing `storm/`:
 
 ```bash
